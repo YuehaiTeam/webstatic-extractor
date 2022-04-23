@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>WebstaticSpineExtractor</title>
+        <script src="https://npm.elemecdn.com/streamsaver@2.0.6/StreamSaver.js"></script>
+    </head>
+    <body>
+        <div>
+            <input type="text" id="url" placeholder="https://webstatic.mohoyo.com/ys/event/....." />
+            <button onclick="clk()" id="btn">Extract</button>
+        </div>
+    </body>
+    <script>
+        // ZIP Stream
+        class Crc32 {
+            constructor() {
+                this.crc = -1;
+            }
+
+            append(data) {
+                var crc = this.crc | 0;
+                var table = this.table;
+                for (var offset = 0, len = data.length | 0; offset < len; offset++) {
+                    crc = (crc >>> 8) ^ table[(crc ^ data[offset]) & 0xff];
+                }
+                this.crc = crc;
+            }
+
+            get() {
+                return ~this.crc;
+            }
+        }
+        Crc32.prototype.table = (() => {
+            var i;
+            var j;
+            var t;
+            var table = [];
+            for (i = 0; i < 256; i++) {
+                t = i;
+                for (j = 0; j < 8; j++) {
+                    t = t & 1 ? (t >>> 1) ^ 0xedb88320 : t >>> 1;
+                }
+                table[i] = t;
+            }
+            return table;
+        })();
+
+        const getDataHelper = (byteLength) => {
+            var uint8 = new Uint8Array(byteLength);
+            return {
+                array: uint8,
+                view: new DataView(uint8.buffer),
+            };
+        };
+
+        const pump = (zipObj) =>
+            zipObj.reader.read().then((chunk) => {
+                if (chunk.done) return zipObj.writeFooter();
+                const outputData = chunk.value;
+                zipObj.crc.append(outputData);
+                zipObj.uncompressedLength += outputData.length;
+                zipObj.compressedLength += outputData.length;
+                zipObj.ctrl.enqueue(outputData);
+            });
+
+        /**
+         * [createWriter description]
+         * @param  {Object} underlyingSource [description]
+         * @return {Boolean}                  [description]
+         */
+        function createWriter(underlyingSource) {
+            const files = Object.create(null);
+            const filenames = [];
+            const encoder = new TextEncoder();
+            let offset = 0;
+            let activeZipIndex = 0;
+            let ctrl;
+            let activeZipObject, closed;
+
+            function next() {
+                activeZipIndex++;
+                activeZipObject = files[filenames[activeZipIndex]];
+                if (activeZipObject) processNextChunk();
+                else if (closed) closeZip();
+            }
+
+            var zipWriter = {
+                enqueue(fileLike) {
+                    if (closed)
+                        throw new TypeError(
+                            'Cannot enqueue a chunk into a readable stream that is closed or has been requested to be closed',
+                        );
+
+                    let name = fileLike.name.trim();
+                    const date = new Date(
+                        typeof fileLike.lastModified === 'undefined' ? Date.now() : fileLike.lastModified,
+                    );
+
+                    if (fileLike.directory && !name.endsWith('/')) name += '/';
+                    if (files[name]) throw new Error('File already exists.');
+
+                    const nameBuf = encoder.encode(name);
+                    filenames.push(name);
+
+                    const zipObject = (files[name] = {
+                        level: 0,
+                        ctrl,
+                        directory: !!fileLike.directory,
+                        nameBuf,
+                        comment: encoder.encode(fileLike.comment || ''),
+                        compressedLength: 0,
+                        uncompressedLength: 0,
+                        writeHeader() {
+                            var header = getDataHelper(26);
+                            var data = getDataHelper(30 + nameBuf.length);
+
+                            zipObject.offset = offset;
+                            zipObject.header = header;
+                            if (zipObject.level !== 0 && !zipObject.directory) {
+                                header.view.setUint16(4, 0x0800);
+                            }
+                            header.view.setUint32(0, 0x14000808);
+                            header.view.setUint16(
+                                6,
+                                (((date.getHours() << 6) | date.getMinutes()) << 5) | (date.getSeconds() / 2),
+                                true,
+                            );
+                            header.view.setUint16(
+                                8,
+                                ((((date.getFullYear() - 1980) << 4) | (date.getMonth() + 1)) << 5) | date.getDate(),
+                                true,
+                            );
+                            header.view.setUint16(22, nameBuf.length, true);
+                            data.view.setUint32(0, 0x504b0304);
+                            data.array.set(header.array, 4);
+                            data.array.set(nameBuf, 30);
+                            offset += data.array.length;
+                            ctrl.enqueue(data.array);
+                        },
+                        writeFooter() {
+                            var footer = getDataHelper(16);
+                            footer.view.setUint32(0, 0x504b0708);
+
+                            if (zipObject.crc) {
+                                zipObject.header.view.setUint32(10, zipObject.crc.get(), true);
+                                zipObject.header.view.setUint32(14, zipObject.compressedLength, true);
+                                zipObject.header.view.setUint32(18, zipObject.uncompressedLength, true);
+                                footer.view.setUint32(4, zipObject.crc.get(), true);
+                                footer.view.setUint32(8, zipObject.compressedLength, true);
+                                footer.view.setUint32(12, zipObject.uncompressedLength, true);
+                            }
+
+                            ctrl.enqueue(footer.array);
+                            offset += zipObject.compressedLength + 16;
+                            next();
+                        },
+                        fileLike,
+                    });
+
+                    if (!activeZipObject) {
+                        activeZipObject = zipObject;
+                        processNextChunk();
+                    }
+                },
+                close() {
+                    if (closed)
+                        throw new TypeError(
+                            'Cannot close a readable stream that has already been requested to be closed',
+                        );
+                    if (!activeZipObject) closeZip();
+                    closed = true;
+                },
+            };
+
+            function closeZip() {
+                var length = 0;
+                var index = 0;
+                var indexFilename, file;
+                for (indexFilename = 0; indexFilename < filenames.length; indexFilename++) {
+                    file = files[filenames[indexFilename]];
+                    length += 46 + file.nameBuf.length + file.comment.length;
+                }
+                const data = getDataHelper(length + 22);
+                for (indexFilename = 0; indexFilename < filenames.length; indexFilename++) {
+                    file = files[filenames[indexFilename]];
+                    data.view.setUint32(index, 0x504b0102);
+                    data.view.setUint16(index + 4, 0x1400);
+                    data.array.set(file.header.array, index + 6);
+                    data.view.setUint16(index + 32, file.comment.length, true);
+                    if (file.directory) {
+                        data.view.setUint8(index + 38, 0x10);
+                    }
+                    data.view.setUint32(index + 42, file.offset, true);
+                    data.array.set(file.nameBuf, index + 46);
+                    data.array.set(file.comment, index + 46 + file.nameBuf.length);
+                    index += 46 + file.nameBuf.length + file.comment.length;
+                }
+                data.view.setUint32(index, 0x504b0506);
+                data.view.setUint16(index + 8, filenames.length, true);
+                data.view.setUint16(index + 10, filenames.length, true);
+                data.view.setUint32(index + 12, length, true);
+                data.view.setUint32(index + 16, offset, true);
+                ctrl.enqueue(data.array);
+                ctrl.close();
+            }
+
+            function processNextChunk() {
+                if (!activeZipObject) return;
+                if (activeZipObject.directory) return activeZipObject.writeFooter(activeZipObject.writeHeader());
+                if (activeZipObject.reader) return pump(activeZipObject);
+                if (activeZipObject.fileLike.stream) {
+                    activeZipObject.crc = new Crc32();
+                    activeZipObject.reader = activeZipObject.fileLike.stream().getReader();
+                    activeZipObject.writeHeader();
+                } else next();
+            }
+            return new ReadableStream({
+                start: (c) => {
+                    ctrl = c;
+                    underlyingSource.start && Promise.resolve(underlyingSource.start(zipWriter));
+                },
+                pull() {
+                    return (
+                        processNextChunk() ||
+                        (underlyingSource.pull && Promise.resolve(underlyingSource.pull(zipWriter)))
+                    );
+                },
+            });
+        }
+
+        window.ZIP = createWriter;
+    </script>
+    <script>
+        function extname(url) {
+            if (url.indexOf('data:') === 0) {
+                const mime = url.match(/data:([^;]+)/)[1];
+                return mime.split('/')[1];
+            }
+            return url.split('.').pop();
+        }
+        function createWebpackRequire(modules, base = '') {
+            const installedModules = {};
+            function __webpack_require__(moduleId) {
+                if (installedModules[moduleId]) return installedModules[moduleId].exports;
+                var module = (installedModules[moduleId] = {
+                    exports: {},
+                    id: moduleId,
+                    loaded: false,
+                });
+                if (!modules[moduleId]) return '';
+                modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+                module.loaded = true;
+                return module.exports;
+            }
+            __webpack_require__.r = function (exports) {
+                if (typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+                    Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+                }
+                Object.defineProperty(exports, '__esModule', { value: true });
+            };
+            __webpack_require__.o = function (object, property) {
+                return Object.prototype.hasOwnProperty.call(object, property);
+            };
+            __webpack_require__.d = function (exports, name, getter) {
+                if (!__webpack_require__.o(exports, name)) {
+                    Object.defineProperty(exports, name, { enumerable: true, get: getter });
+                }
+            };
+            __webpack_require__.c = installedModules;
+            __webpack_require__.p = base;
+            return __webpack_require__;
+        }
+        function extractSpine(modules, url = '', w = window) {
+            const maybeFuncs = [];
+            Object.keys(modules).forEach((k) => {
+                const e = modules[k];
+                const et = e.toString();
+                if (et.includes('atlas:') && et.includes('json:')) maybeFuncs.push(k);
+            });
+            console.log('Detected Top-Level Modules:', maybeFuncs);
+            const webpackRequire = createWebpackRequire(modules, url);
+            const insideModules = [];
+            w.Object._defineProperty = Object.defineProperty;
+            w.Object.defineProperty = (module, __esmodule, value) => {
+                if (__esmodule === '__esModule') {
+                    insideModules.push(module);
+                }
+                return w.Object._defineProperty(module, __esmodule, value);
+            };
+            const maybeModules = maybeFuncs.map((e) => webpackRequire(e));
+            w.Object.defineProperty = Object._defineProperty;
+            const spines = [];
+            const mains = [];
+            console.log('Detected Sub-Level Modules:', insideModules);
+            const checkva = (va) => {
+                const vk = Array.isArray(va) ? 0 : Object.keys(va)[0];
+                const v = va[vk];
+                if (!v) return;
+                if (v.atlas && v.json) {
+                    spines.push(va);
+                }
+                if (v.id && v.src && v.type) {
+                    mains.push(va);
+                }
+            };
+            insideModules.forEach((e) => {
+                const ek = Object.keys(e);
+                ek.forEach((k) => {
+                    if (k.includes && k.includes('_MANIFEST')) {
+                        const obj = e[k];
+                        Object.values(obj).forEach(checkva);
+                        checkva(obj);
+                    }
+                });
+            });
+            return {
+                SPINE_MANIFEST: spines.reduce((b, a) => Object.assign(a, b), {}),
+                MAIN_MANIFEST: mains.reduce((b, a) => Object.assign(a, b), {}),
+            };
+        }
+        async function loadPageInIframe(url) {
+            // fetch url and load by srcdoc
+            const response = await fetch(url);
+            let html = await response.text();
+            html = html.replace(new RegExp(`<script type="text/javascript">`, 'g'), `<script type="text/dontexecute">`);
+            html = html.replace('<head>', `<head><base href="${url}">`);
+            const iframe = document.createElement('iframe');
+            iframe.srcdoc = html;
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            return new Promise((resolve) => {
+                iframe.onload = () => {
+                    resolve(iframe);
+                };
+            });
+        }
+        async function extract(url) {
+            btn.innerText = 'Downloading Resources';
+            const frame = await loadPageInIframe(url);
+            btn.innerText = 'Extracting Data';
+            const webpackJsonp = frame.contentWindow.webpackJsonp;
+            const vendors = webpackJsonp.find((e) => e[0].includes('vendors'));
+            if (!vendors) {
+                console.log('Load vendors.js faild');
+                return;
+            }
+            const Index = webpackJsonp.find((e) => e[0].includes('index'));
+            if (!Index) {
+                console.log('Load index.js faild');
+                return;
+            }
+            const modules = { ...vendors[1], ...Index[1] };
+            const spineres = extractSpine(modules, new URL('.', url).toString(), frame.contentWindow);
+            console.log('Got Spine Config', spineres);
+            btn.innerText = 'Downloading images';
+            const fn = (url.match(/event\/(.*?)\//) || ['', ''])[1].split('-')[0] || Date.now().toString();
+            const fileStream = streamSaver.createWriteStream(fn + '.zip');
+            const readableZipStream = new ZIP({
+                async start(ctrl) {
+                    // save spine json & atlas
+                    for (const i of Object.keys(spineres.SPINE_MANIFEST)) {
+                        const atlas = new File([spineres.SPINE_MANIFEST[i].atlas], i + '.atlas', {
+                            type: 'text/plain',
+                        });
+                        ctrl.enqueue(atlas);
+                        const json = new File([JSON.stringify(spineres.SPINE_MANIFEST[i].json, null, 4)], i + '.json', {
+                            type: 'application/json',
+                        });
+                        ctrl.enqueue(json);
+                    }
+                    // save images
+                    const promises = Object.values(spineres.MAIN_MANIFEST).map((e) => {
+                        if (e.type !== 'image') return Promise.resolve();
+                        const url = e.src;
+                        const fn = e.id + '.' + extname(e.src);
+                        return fetch(url).then(async (res) => {
+                            // read as blob
+                            const blob = await res.blob();
+                            const file = new File([blob], fn, {
+                                type: blob.type,
+                            });
+                            ctrl.enqueue(file);
+                        });
+                    });
+                    await Promise.all(promises);
+                    ctrl.close();
+                    btn.innerText = 'Done';
+                },
+            });
+            if (window.WritableStream && readableZipStream.pipeTo) {
+                return readableZipStream.pipeTo(fileStream).then(() => console.log('done writing'));
+            }
+            const writer = fileStream.getWriter();
+            const reader = readableZipStream.getReader();
+            const pump = () =>
+                reader.read().then((res) => (res.done ? writer.close() : writer.write(res.value).then(pump)));
+            pump();
+            /*
+            const json = JSON.stringify(
+                {
+                    spine: spineres.SPINE_MANIFEST,
+                    asstes: spineres.MAIN_MANIFEST,
+                },
+                null,
+                4,
+            );
+            // download json
+            const blob = new Blob([json], { type: 'application/json' });
+            const burl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = burl;
+            a.download = `${fn}.json`;
+            a.click();*/
+        }
+        async function clk() {
+            try {
+                await extract(url.value);
+            } catch (e) {
+                console.error(e);
+                btn.innerText = 'Error!';
+            }
+        }
+    </script>
+</html>
