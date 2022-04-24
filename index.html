@@ -11,6 +11,7 @@
         <div>
             <input type="text" id="url" placeholder="https://webstatic.mohoyo.com/ys/event/....." />
             <button onclick="clk()" id="btn">Extract</button>
+            <div id="desc"></div>
         </div>
     </body>
     <script>
@@ -100,7 +101,7 @@
                     );
 
                     if (fileLike.directory && !name.endsWith('/')) name += '/';
-                    if (files[name]) throw new Error('File already exists.');
+                    if (files[name]) return false; // throw new Error('File ' + name + ' already exists.');
 
                     const nameBuf = encoder.encode(name);
                     filenames.push(name);
@@ -241,6 +242,12 @@
             }
             return url.split('.').pop();
         }
+        function basename(url) {
+            if (url.indexOf('data:') === 0) {
+                return '';
+            }
+            return url.split('/').pop();
+        }
         function createWebpackRequire(modules, base = '') {
             const installedModules = {};
             function __webpack_require__(moduleId) {
@@ -295,15 +302,22 @@
             const spines = [];
             const mains = [];
             console.log('Detected Sub-Level Modules:', insideModules);
-            const checkva = (va) => {
+            const checkva = (va, name) => {
                 const vk = Array.isArray(va) ? 0 : Object.keys(va)[0];
                 const v = va[vk];
                 if (!v) return;
                 if (v.atlas && v.json) {
                     spines.push(va);
+                    Object.values(va).forEach((v) => {
+                        v.module = name;
+                    });
+                    return;
                 }
                 if (v.id && v.src && v.type) {
                     mains.push(va);
+                    va.forEach((v) => {
+                        v.module = name;
+                    });
                 }
             };
             insideModules.forEach((e) => {
@@ -311,14 +325,57 @@
                 ek.forEach((k) => {
                     if (k.includes && k.includes('_MANIFEST')) {
                         const obj = e[k];
-                        Object.values(obj).forEach(checkva);
-                        checkva(obj);
+                        const name = k.replace('_MANIFEST', '');
+                        console.log(name, obj);
+                        Object.values(obj).forEach((e) => checkva(e, name));
+                        checkva(obj, '');
                     }
                 });
             });
+            console.log(mains);
             return {
                 SPINE_MANIFEST: spines.reduce((b, a) => Object.assign(a, b), {}),
-                MAIN_MANIFEST: mains.reduce((b, a) => Object.assign(a, b), {}),
+                MAIN_MANIFEST: mains.reduce((b, a) => a.concat(b), []),
+            };
+        }
+        function extractStaticFiles(modules, base) {
+            const matches = [];
+            Object.keys(modules).forEach((k) => {
+                const e = modules[k];
+                const et = e.toString();
+                const match = et.match(/[a-zA-Z0-9]\.exports\s?=\s?([a-zA-Z0-9]\.[a-zA-Z0-9]\s?\+)?\s?"(.*?)"/);
+                if (match) {
+                    const url = match[2];
+                    if (!url.startsWith('data:') && !match[1]) {
+                        return;
+                    }
+                    let bname = basename(url);
+                    if (bname) {
+                        const a = bname.split('.');
+                        a.pop(); // remove extension
+                        if (a.length >= 2) {
+                            // remove webpack hash
+                            a.pop();
+                        }
+                        bname = a.join('.');
+                    } else {
+                        bname = k.replace(/\//g, '_').replace(/\./g, '_').replace(/\:/g, '_').replace(/\+/g, '_');
+                    }
+                    matches.push({
+                        id: bname,
+                        src: url.includes('data:') ? url : new URL(url, base).toString(),
+                        _module: k,
+                    });
+                }
+            });
+            return matches;
+        }
+        async function fetchToZip(name, url) {
+            const res = await fetch(url);
+            const stream = () => res.body;
+            return {
+                name,
+                stream,
             };
         }
         async function loadPageInIframe(url) {
@@ -338,90 +395,95 @@
             });
         }
         async function extract(url) {
-            btn.innerText = 'Downloading Resources';
+            btn.innerText = 'Fetching Page...';
             const frame = await loadPageInIframe(url);
-            btn.innerText = 'Extracting Data';
+            btn.innerText = 'Extracting Data...';
             const webpackJsonp = frame.contentWindow.webpackJsonp;
             const vendors = webpackJsonp.find((e) => e[0].includes('vendors'));
             if (!vendors) {
-                console.log('Load vendors.js faild');
+                btn.innerText = 'Load vendors.js faild!';
                 return;
             }
             const Index = webpackJsonp.find((e) => e[0].includes('index'));
             if (!Index) {
-                console.log('Load index.js faild');
+                btn.innerText = 'Load index.js faild!';
                 return;
             }
-            const modules = { ...vendors[1], ...Index[1] };
+            const Runtime = webpackJsonp.find((e) => e[0].includes('runtime'));
+            const modules = { ...vendors[1], ...Index[1], ...(Runtime ? Runtime[1] : {}) };
             const spineres = extractSpine(modules, new URL('.', url).toString(), frame.contentWindow);
-            console.log('Got Spine Config', spineres);
-            btn.innerText = 'Downloading images';
+            console.log('Got Spine Data', spineres);
+            const staticres = extractStaticFiles(modules, url);
+            console.log('Got Static Files', staticres);
+            btn.innerText = 'Preparing resources...';
             const fn = (url.match(/event\/(.*?)\//) || ['', ''])[1].split('-')[0] || Date.now().toString();
             const fileStream = streamSaver.createWriteStream(fn + '.zip');
             const readableZipStream = new ZIP({
                 async start(ctrl) {
+                    btn.innerText = 'Download started...';
+                    const savedIds = [];
                     // save spine json & atlas
                     for (const i of Object.keys(spineres.SPINE_MANIFEST)) {
-                        const atlas = new File([spineres.SPINE_MANIFEST[i].atlas], i + '.atlas', {
+                        const dir = spineres.SPINE_MANIFEST[i].module || '';
+                        const atlas = new File([spineres.SPINE_MANIFEST[i].atlas], dir + '/' + i + '.atlas', {
                             type: 'text/plain',
                         });
                         ctrl.enqueue(atlas);
-                        const json = new File([JSON.stringify(spineres.SPINE_MANIFEST[i].json, null, 4)], i + '.json', {
-                            type: 'application/json',
-                        });
-                        ctrl.enqueue(json);
+                        const j = spineres.SPINE_MANIFEST[i].json;
+                        if (typeof j === 'string' && j.indexOf('http') === 0) {
+                            savedIds.push(j);
+                            ctrl.enqueue(await fetchToZip(dir + '/' + i + '.json', j));
+                        } else {
+                            const json = new File([JSON.stringify(j, null, 4)], dir + '/' + i + '.json', {
+                                type: 'application/json',
+                            });
+                            ctrl.enqueue(json);
+                        }
                     }
                     // save images
                     const promises = Object.values(spineres.MAIN_MANIFEST).map((e) => {
-                        if (e.type !== 'image') return Promise.resolve();
-                        const url = e.src;
-                        const fn = e.id + '.' + extname(e.src);
-                        return fetch(url).then(async (res) => {
-                            // read as blob
-                            const blob = await res.blob();
-                            const file = new File([blob], fn, {
-                                type: blob.type,
-                            });
-                            ctrl.enqueue(file);
-                        });
+                        const dir = e.module || '';
+                        const fn = dir + '/' + e.id + '.' + extname(e.src);
+                        savedIds.push(e.src);
+                        return fetchToZip(fn, e.src).then((res) => ctrl.enqueue(res));
                     });
-                    await Promise.all(promises);
+                    // save other static
+                    let otherlen = 0;
+                    const staticPromises = staticres.map((e) => {
+                        //skip things in savedIds
+                        if (savedIds.includes(e.src)) {
+                            return Promise.resolve();
+                        }
+                        const dir = '_other_resources';
+                        const fn = dir + '/' + e.id + '.' + extname(e.src);
+                        savedIds.push(e.src);
+                        otherlen++;
+                        return fetchToZip(fn, e.src).then((res) => ctrl.enqueue(res));
+                    });
+                    desc.innerText =
+                        `Extracted ${Object.keys(spineres.SPINE_MANIFEST).length} spine(s), ` +
+                        `${Object.keys(spineres.MAIN_MANIFEST).length} render-related image(s), ` +
+                        `${otherlen} other resource(s)`;
+                    await Promise.all(promises.concat(staticPromises));
                     ctrl.close();
-                    btn.innerText = 'Done';
                 },
             });
             if (window.WritableStream && readableZipStream.pipeTo) {
-                return readableZipStream.pipeTo(fileStream).then(() => console.log('done writing'));
+                await readableZipStream.pipeTo(fileStream);
+                btn.innerText = 'Done';
+            } else {
+                btn.innerText = 'FileWriter Unsupported!';
             }
-            const writer = fileStream.getWriter();
-            const reader = readableZipStream.getReader();
-            const pump = () =>
-                reader.read().then((res) => (res.done ? writer.close() : writer.write(res.value).then(pump)));
-            pump();
-            /*
-            const json = JSON.stringify(
-                {
-                    spine: spineres.SPINE_MANIFEST,
-                    asstes: spineres.MAIN_MANIFEST,
-                },
-                null,
-                4,
-            );
-            // download json
-            const blob = new Blob([json], { type: 'application/json' });
-            const burl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = burl;
-            a.download = `${fn}.json`;
-            a.click();*/
         }
         async function clk() {
+            btn.disabled = true;
             try {
                 await extract(url.value);
             } catch (e) {
                 console.error(e);
                 btn.innerText = 'Error!';
             }
+            btn.disabled = false;
         }
     </script>
 </html>
