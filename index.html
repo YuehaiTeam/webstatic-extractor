@@ -7,6 +7,7 @@
         <title>WebstaticSpineExtractor</title>
         <script src="https://npm.elemecdn.com/streamsaver@2.0.6/StreamSaver.js"></script>
     </head>
+
     <body>
         <div>
             <input type="text" id="url" placeholder="https://webstatic.mohoyo.com/ys/event/....." />
@@ -382,38 +383,103 @@
             // fetch url and load by srcdoc
             const response = await fetch(url);
             let html = await response.text();
-            html = html.replace(new RegExp(`<script type="text/javascript">`, 'g'), `<script type="text/dontexecute">`);
-            html = html.replace('<head>', `<head><base href="${url}">`);
+            if (html.includes('webpackJsonp')) {
+                html = html.replace(
+                    new RegExp(`<script type="text/javascript">`, 'g'),
+                    `<script type="text/dontexecute">`,
+                );
+            } else {
+                html = html.replace(
+                    `</head>`,
+                    `\<script\>
+window.webpackJsonp_ = [];
+window.cachedModules = [];
+window.loadedModules = [];
+window.webpackJsonpProxy = new Proxy(webpackJsonp_, {
+    get: (target, prop) => {
+        if (prop === 'push') {
+            return (...args) => {
+                console.log(args);
+                cachedModules.push(...args);
+            };
+        }
+        if (prop in target) {
+            return target[prop];
+        }
+        return undefined;
+    },
+    set: (target, prop, value) => {
+        if (prop === 'push') {
+            value(['inject',{
+                inject(module, exports, __webpack_require__){
+                    loadedModules = __webpack_require__.m
+                }
+            },[['inject']]])
+            console.log('set', prop, value);
+            return true;
+        }
+        target[prop] = value;
+        return true;
+    },
+});
+Object.defineProperty(window, 'webpackJsonp', {
+    value: webpackJsonpProxy,
+    writable: false,
+    enumerable: false,
+    configurable: false,
+});\</script\>`,
+                );
+            }
+            let base = url;
+            const matchVendors = html.match(/src="(.*?\/)vendors(.*?)js"/);
+            console.log(matchVendors);
+            if (matchVendors) {
+                base = matchVendors[1];
+            }
+            html = html.replace('<head>', `<head><base href="${base}">`);
             const iframe = document.createElement('iframe');
             iframe.srcdoc = html;
             iframe.style.display = 'none';
             document.body.appendChild(iframe);
             return new Promise((resolve) => {
                 iframe.onload = () => {
-                    resolve(iframe);
+                    resolve({ iframe, base });
                 };
             });
         }
         async function extract(url) {
             btn.innerText = 'Fetching Page...';
-            const frame = await loadPageInIframe(url);
+            const { iframe: frame, base } = await loadPageInIframe(url);
             btn.innerText = 'Extracting Data...';
-            const webpackJsonp = frame.contentWindow.webpackJsonp;
-            const vendors = webpackJsonp.find((e) => e[0].includes('vendors'));
-            if (!vendors) {
-                btn.innerText = 'Load vendors.js faild!';
-                return;
+            let modules = {};
+            if (frame.contentWindow.cachedModules) {
+                modules = {
+                    ...frame.contentWindow.loadedModules,
+                };
+                for (const i of frame.contentWindow.cachedModules) {
+                    modules = {
+                        ...modules,
+                        ...i[1],
+                    };
+                }
+            } else {
+                const webpackJsonp = frame.contentWindow.webpackJsonp;
+                const vendors = webpackJsonp.find((e) => e[0].includes('vendors'));
+                if (!vendors) {
+                    btn.innerText = 'Load vendors.js faild!';
+                    return;
+                }
+                const Index = webpackJsonp.find((e) => e[0].includes('index'));
+                if (!Index) {
+                    btn.innerText = 'Load index.js faild!';
+                    return;
+                }
+                const Runtime = webpackJsonp.find((e) => e[0].includes('runtime'));
+                modules = { ...vendors[1], ...Index[1], ...(Runtime ? Runtime[1] : {}) };
             }
-            const Index = webpackJsonp.find((e) => e[0].includes('index'));
-            if (!Index) {
-                btn.innerText = 'Load index.js faild!';
-                return;
-            }
-            const Runtime = webpackJsonp.find((e) => e[0].includes('runtime'));
-            const modules = { ...vendors[1], ...Index[1], ...(Runtime ? Runtime[1] : {}) };
-            const spineres = extractSpine(modules, new URL('.', url).toString(), frame.contentWindow);
+            const spineres = extractSpine(modules, new URL('.', base).toString(), frame.contentWindow);
             console.log('Got Spine Data', spineres);
-            const staticres = extractStaticFiles(modules, url);
+            const staticres = extractStaticFiles(modules, new URL('.', base).toString());
             console.log('Got Static Files', staticres);
             btn.innerText = 'Preparing resources...';
             const fn = (url.match(/event\/(.*?)\//) || ['', ''])[1].split('-')[0] || Date.now().toString();
