@@ -4,13 +4,86 @@
         <meta charset="UTF-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>WebstaticSpineExtractor</title>
-        <script src="https://npm.elemecdn.com/streamsaver@2.0.6/StreamSaver.js"></script>
+        <title>webstatic-extractor</title>
+        <script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
+        <style>
+            body {
+                display: flex;
+                align-content: center;
+                justify-content: center;
+                align-items: center;
+                height: 100%;
+                margin: 0;
+                padding-bottom: 100px;
+                box-sizing: border-box;
+                flex-direction: column;
+            }
+
+            html {
+                height: 100%;
+            }
+            #url {
+                display: block;
+                width: 100%;
+                margin: 0 auto;
+                outline: 0;
+                height: 45px;
+                box-sizing: border-box;
+                border: 1px solid #409eff;
+                border-radius: 2px;
+                text-align: center;
+                font-size: 15px;
+                font-family: Consolas, monospace;
+                padding: 0 10px;
+                padding-right: 80px;
+            }
+            #desc {
+                height: 80px;
+                font-family: Consolas, monospace;
+                margin-top: 10px;
+                color: #666;
+                font-size: 14px;
+                text-align: center;
+            }
+            #btn {
+                display: block;
+                position: absolute;
+                right: 4px;
+                top: 4px;
+                height: 37px;
+                width: auto;
+                background: #409eff;
+                border: 0;
+                border-radius: 2px;
+                color: #fff;
+                padding: 0 15px;
+                font-family: Consolas, monospace;
+                font-size: 12px;
+            }
+
+            #cc {
+                position: relative;
+                width: 640px;
+                max-width: 90%;
+            }
+            #tt {
+                font-size: 35px;
+                font-family: Consolas, monospace;
+                color: #409eff;
+                margin-bottom: 20px;
+            }
+            #tt span {
+                font-weight: bold;
+                color: #2c7dd0;
+            }
+        </style>
     </head>
 
     <body>
-        <div>
-            <input type="text" id="url" placeholder="https://webstatic.mohoyo.com/ys/event/....." />
+        <div id="tt"><span>W</span>ebstatic <span>E</span>xtractor</div>
+        <div id="cc">
+            <input type="text" id="url" placeholder="https://webstatic.mihoyo.com/....." />
             <button onclick="clk()" id="btn">Extract</button>
             <div id="desc"></div>
         </div>
@@ -273,10 +346,23 @@
                 return Object.prototype.hasOwnProperty.call(object, property);
             };
             __webpack_require__.d = function (exports, name, getter) {
+                if (!getter) {
+                    const definition = name;
+                    for (var key in definition) {
+                        if (__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+                            Object.defineProperty(exports, key, {
+                                enumerable: true,
+                                get: definition[key],
+                            });
+                        }
+                    }
+                    return;
+                }
                 if (!__webpack_require__.o(exports, name)) {
                     Object.defineProperty(exports, name, { enumerable: true, get: getter });
                 }
             };
+
             __webpack_require__.c = installedModules;
             __webpack_require__.p = base;
             return __webpack_require__;
@@ -288,7 +374,8 @@
                 const et = e.toString();
                 if (et.includes('atlas:') && et.includes('json:')) maybeFuncs.push(k);
             });
-            console.log('Detected Top-Level Modules:', maybeFuncs);
+            console.log('[extractSpine] Detected Top-Level Modules:', maybeFuncs);
+            console.log(modules);
             const webpackRequire = createWebpackRequire(modules, url);
             const insideModules = [];
             w.Object._defineProperty = Object.defineProperty;
@@ -298,6 +385,7 @@
                 }
                 return w.Object._defineProperty(module, __esmodule, value);
             };
+            const globalThis = window;
             const maybeModules = maybeFuncs.map((e) => webpackRequire(e));
             w.Object.defineProperty = Object._defineProperty;
             const spines = [];
@@ -389,6 +477,38 @@
                     `<script type="text/dontexecute">`,
                 );
             } else {
+                let entrName = '';
+                if (html.includes('Symbol.toStringTag') && html.includes('Object.defineProperty')) {
+                    // modified webpackjsonp name in html
+                    // parse to dom
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const script = doc.querySelectorAll('script');
+                    script.forEach((s) => {
+                        if (
+                            s.src.includes('sentry') ||
+                            s.textContent.includes('Sentry') ||
+                            s.textContent.includes('firebase')
+                        )
+                            s.type = 'text/dontexecute';
+                        if (
+                            s.textContent.includes('Symbol.toStringTag') &&
+                            s.textContent.includes('Object.defineProperty')
+                        ) {
+                            s.type = 'text/dontexecute';
+                            const matches = [...s.textContent.matchAll(/self\.(.*?)=self.(.*?)\|\|\[\]/g)];
+                            for (const match of matches) {
+                                if (match[1] == match[2]) {
+                                    if (entrName != '') {
+                                        alert(`Warning: Multiple entry points found: ${entrName} and ${match[1]}`);
+                                    }
+                                    entrName = match[1];
+                                }
+                            }
+                        }
+                    });
+                    html = doc.documentElement.outerHTML;
+                }
                 html = html.replace(
                     `</head>`,
                     `\<script\>
@@ -422,9 +542,9 @@ window.webpackJsonpProxy = new Proxy(webpackJsonp_, {
         return true;
     },
 });
-Object.defineProperty(window, 'webpackJsonp', {
+Object.defineProperty(window, '${entrName || 'webpackJsonp'}', {
     value: webpackJsonpProxy,
-    writable: false,
+    writable: true,
     enumerable: false,
     configurable: false,
 });\</script\>`,
@@ -450,6 +570,7 @@ Object.defineProperty(window, 'webpackJsonp', {
         async function extract(url) {
             btn.innerText = 'Fetching Page...';
             const { iframe: frame, base } = await loadPageInIframe(url);
+            frame.contentWindow.regeneratorRuntime = regeneratorRuntime;
             btn.innerText = 'Extracting Data...';
             let modules = {};
             if (frame.contentWindow.cachedModules) {
@@ -464,6 +585,7 @@ Object.defineProperty(window, 'webpackJsonp', {
                 }
             } else {
                 const webpackJsonp = frame.contentWindow.webpackJsonp;
+                console.log('found WebpackJsonp', webpackJsonp);
                 const vendors = webpackJsonp.find((e) => e[0].includes('vendors'));
                 if (!vendors) {
                     btn.innerText = 'Load vendors.js faild!';
