@@ -8,7 +8,7 @@
         <script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
         <style>
-             body {
+            body {
                 display: flex;
                 align-content: center;
                 justify-content: center;
@@ -680,6 +680,13 @@ Object.defineProperty(window, '${entrName || 'webpackJsonp'}', {
                 btn.innerText = 'Error!';
             }
             btn.disabled = false;
+        }
+        const href = location.href.replace(location.search, '').replace(location.hash, '');
+        if (href.endsWith('.html') && href.includes('event/')) {
+            url.value = href
+                .replace(location.origin, 'https://webstatic.mihoyo.com')
+                .replace('/webstatic-extractor/', '/');
+            clk();
         }
     </script>
 </html>
