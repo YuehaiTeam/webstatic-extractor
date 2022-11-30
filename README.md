@@ -4,6 +4,10 @@ Extract spine atlas &amp; json &amp; images from genshin web activity pages in o
 
 如有部分素材无法提取，说明素材是从服务器动态获取的，不在资源包里。
 
+### 其他参考：
+
+[米哈游平台前端团队: WebGL 动画工业化探索与实践](https://www.infoq.cn/article/mszq5ecr5t5qqfatmf3j)
+
 ### 米厂更新webpack5之后的原理：
 和之前相比，发生的变化有：
  - `chunkLoadingGlobal`跟随默认值，随package.json里的项目名变化
