@@ -578,7 +578,7 @@ window.webpackJsonpProxy = new Proxy(webpackJsonp_, {
 Object.defineProperty(window, '${entrName || 'webpackJsonp'}', {
     value: webpackJsonpProxy,
     writable: true,
-    enumerable: false,
+    enumerable: false,base
     configurable: false,
 });\</script\>`,
                 );
@@ -588,6 +588,9 @@ Object.defineProperty(window, '${entrName || 'webpackJsonp'}', {
             console.log(matchVendors);
             if (matchVendors) {
                 base = matchVendors[1];
+            }
+            if(!base.includes('://')){
+                base = new URL(base, url).toString()
             }
             html = html.replace('<head>', `<head><base href="${base}">`);
             const iframe = document.createElement('iframe');
