@@ -1,720 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>webstatic-extractor</title>
-        <script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
-        <style>
-            body {
-                display: flex;
-                align-content: center;
-                justify-content: center;
-                align-items: center;
-                height: 100%;
-                margin: 0;
-                padding-bottom: 100px;
-                box-sizing: border-box;
-                flex-direction: column;
-            }
-            html {
-                height: 100%;
-            }
-            #url {
-                display: block;
-                width: 100%;
-                margin: 0 auto;
-                outline: 0;
-                height: 45px;
-                box-sizing: border-box;
-                border: 1px solid #ef930b;
-                border-radius: 2px;
-                text-align: center;
-                font-size: 15px;
-                font-family: Consolas, monospace;
-                padding: 0 10px;
-                padding-right: 80px;
-            }
-            #desc {
-                height: 80px;
-                font-family: Consolas, monospace;
-                margin-top: 10px;
-                color: #666;
-                font-size: 14px;
-                text-align: center;
-            }
-            #btn {
-                display: block;
-                position: absolute;
-                right: 4px;
-                top: 4px;
-                height: 37px;
-                width: auto;
-                background: #ef930b;
-                border: 0;
-                border-radius: 2px;
-                color: #fff;
-                padding: 0 15px;
-                font-family: Consolas, monospace;
-                font-size: 12px;
-            }
 
-            #cc {
-                position: relative;
-                width: 640px;
-                max-width: 90%;
-            }
-            #tt {
-                font-size: 35px;
-                font-family: Consolas, monospace;
-                color: #ef930b;
-                margin-bottom: 20px;
-                text-align: center;
-            }
-            #tt span {
-                font-weight: bold;
-                color: #d86c32;
-            }
-        </style>
-        <script>
-            var _hmt = _hmt || [];
-            (function () {
-                var hm = document.createElement('script');
-                hm.src = 'https://hm.baidu.com/hm.js?51a2b668c772c432525c1163279ed0c7';
-                var s = document.getElementsByTagName('script')[0];
-                s.parentNode.insertBefore(hm, s);
-            })();
-        </script>
-    </head>
-
-    <body>
-        <div id="tt"><span>W</span>ebstatic <span>E</span>xtractor</div>
-        <div id="cc">
-            <input type="text" id="url" placeholder="https://webstatic.mihoyo.com/....." />
-            <button onclick="clk()" id="btn">Extract</button>
-            <div id="desc"></div>
-        </div>
-        <a
-            href="https://github.com/YuehaiTeam/webstatic-extractor"
-            class="github-corner"
-            aria-label="View source on GitHub"
-            ><svg
-                width="80"
-                height="80"
-                viewBox="0 0 250 250"
-                style="fill: #fa932f; color: #fff; position: absolute; top: 0; border: 0; right: 0"
-                aria-hidden="true"
-            >
-                <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
-                <path
-                    d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2"
-                    fill="currentColor"
-                    style="transform-origin: 130px 106px"
-                    class="octo-arm"
-                ></path>
-                <path
-                    d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z"
-                    fill="currentColor"
-                    class="octo-body"
-                ></path></svg
-        ></a>
-    </body>
-    <script>
-        // ZIP Stream
-        class Crc32 {
-            constructor() {
-                this.crc = -1;
-            }
-
-            append(data) {
-                var crc = this.crc | 0;
-                var table = this.table;
-                for (var offset = 0, len = data.length | 0; offset < len; offset++) {
-                    crc = (crc >>> 8) ^ table[(crc ^ data[offset]) & 0xff];
-                }
-                this.crc = crc;
-            }
-
-            get() {
-                return ~this.crc;
-            }
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>webstatic-extractor</title>
+    <style>
+        body {
+            display: flex;
+            align-content: center;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            margin: 0;
+            padding-bottom: 100px;
+            box-sizing: border-box;
+            flex-direction: column;
         }
-        Crc32.prototype.table = (() => {
-            var i;
-            var j;
-            var t;
-            var table = [];
-            for (i = 0; i < 256; i++) {
-                t = i;
-                for (j = 0; j < 8; j++) {
-                    t = t & 1 ? (t >>> 1) ^ 0xedb88320 : t >>> 1;
-                }
-                table[i] = t;
-            }
-            return table;
+
+        html {
+            height: 100%;
+        }
+
+        #url {
+            display: block;
+            width: 100%;
+            margin: 0 auto;
+            outline: 0;
+            height: 45px;
+            box-sizing: border-box;
+            border: 1px solid #ef930b;
+            border-radius: 2px;
+            text-align: center;
+            font-size: 15px;
+            font-family: Consolas, monospace;
+            padding: 0 10px;
+            padding-right: 80px;
+        }
+
+        #desc {
+            height: 80px;
+            font-family: Consolas, monospace;
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        #btn {
+            display: block;
+            position: absolute;
+            right: 4px;
+            top: 4px;
+            height: 37px;
+            width: auto;
+            background: #ef930b;
+            border: 0;
+            border-radius: 2px;
+            color: #fff;
+            padding: 0 15px;
+            font-family: Consolas, monospace;
+            font-size: 12px;
+        }
+
+        #cc {
+            position: relative;
+            width: 640px;
+            max-width: 90%;
+        }
+
+        #tt {
+            font-size: 35px;
+            font-family: Consolas, monospace;
+            color: #ef930b;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #tt span {
+            font-weight: bold;
+            color: #d86c32;
+        }
+    </style>
+    <script>
+        var _hmt = _hmt || [];
+        (function () {
+            var hm = document.createElement('script');
+            hm.src = 'https://hm.baidu.com/hm.js?51a2b668c772c432525c1163279ed0c7';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(hm, s);
         })();
-
-        const getDataHelper = (byteLength) => {
-            var uint8 = new Uint8Array(byteLength);
-            return {
-                array: uint8,
-                view: new DataView(uint8.buffer),
-            };
-        };
-
-        const pump = (zipObj) =>
-            zipObj.reader.read().then((chunk) => {
-                if (chunk.done) return zipObj.writeFooter();
-                const outputData = chunk.value;
-                zipObj.crc.append(outputData);
-                zipObj.uncompressedLength += outputData.length;
-                zipObj.compressedLength += outputData.length;
-                zipObj.ctrl.enqueue(outputData);
-            });
-
-        /**
-         * [createWriter description]
-         * @param  {Object} underlyingSource [description]
-         * @return {Boolean}                  [description]
-         */
-        function createWriter(underlyingSource) {
-            const files = Object.create(null);
-            const filenames = [];
-            const encoder = new TextEncoder();
-            let offset = 0;
-            let activeZipIndex = 0;
-            let ctrl;
-            let activeZipObject, closed;
-
-            function next() {
-                activeZipIndex++;
-                activeZipObject = files[filenames[activeZipIndex]];
-                if (activeZipObject) processNextChunk();
-                else if (closed) closeZip();
-            }
-
-            var zipWriter = {
-                enqueue(fileLike) {
-                    if (closed)
-                        throw new TypeError(
-                            'Cannot enqueue a chunk into a readable stream that is closed or has been requested to be closed',
-                        );
-
-                    let name = fileLike.name.trim();
-                    const date = new Date(
-                        typeof fileLike.lastModified === 'undefined' ? Date.now() : fileLike.lastModified,
-                    );
-
-                    if (fileLike.directory && !name.endsWith('/')) name += '/';
-                    if (files[name]) return false; // throw new Error('File ' + name + ' already exists.');
-
-                    const nameBuf = encoder.encode(name);
-                    filenames.push(name);
-
-                    const zipObject = (files[name] = {
-                        level: 0,
-                        ctrl,
-                        directory: !!fileLike.directory,
-                        nameBuf,
-                        comment: encoder.encode(fileLike.comment || ''),
-                        compressedLength: 0,
-                        uncompressedLength: 0,
-                        writeHeader() {
-                            var header = getDataHelper(26);
-                            var data = getDataHelper(30 + nameBuf.length);
-
-                            zipObject.offset = offset;
-                            zipObject.header = header;
-                            if (zipObject.level !== 0 && !zipObject.directory) {
-                                header.view.setUint16(4, 0x0800);
-                            }
-                            header.view.setUint32(0, 0x14000808);
-                            header.view.setUint16(
-                                6,
-                                (((date.getHours() << 6) | date.getMinutes()) << 5) | (date.getSeconds() / 2),
-                                true,
-                            );
-                            header.view.setUint16(
-                                8,
-                                ((((date.getFullYear() - 1980) << 4) | (date.getMonth() + 1)) << 5) | date.getDate(),
-                                true,
-                            );
-                            header.view.setUint16(22, nameBuf.length, true);
-                            data.view.setUint32(0, 0x504b0304);
-                            data.array.set(header.array, 4);
-                            data.array.set(nameBuf, 30);
-                            offset += data.array.length;
-                            ctrl.enqueue(data.array);
-                        },
-                        writeFooter() {
-                            var footer = getDataHelper(16);
-                            footer.view.setUint32(0, 0x504b0708);
-
-                            if (zipObject.crc) {
-                                zipObject.header.view.setUint32(10, zipObject.crc.get(), true);
-                                zipObject.header.view.setUint32(14, zipObject.compressedLength, true);
-                                zipObject.header.view.setUint32(18, zipObject.uncompressedLength, true);
-                                footer.view.setUint32(4, zipObject.crc.get(), true);
-                                footer.view.setUint32(8, zipObject.compressedLength, true);
-                                footer.view.setUint32(12, zipObject.uncompressedLength, true);
-                            }
-
-                            ctrl.enqueue(footer.array);
-                            offset += zipObject.compressedLength + 16;
-                            next();
-                        },
-                        fileLike,
-                    });
-
-                    if (!activeZipObject) {
-                        activeZipObject = zipObject;
-                        processNextChunk();
-                    }
-                },
-                close() {
-                    if (closed)
-                        throw new TypeError(
-                            'Cannot close a readable stream that has already been requested to be closed',
-                        );
-                    if (!activeZipObject) closeZip();
-                    closed = true;
-                },
-            };
-
-            function closeZip() {
-                var length = 0;
-                var index = 0;
-                var indexFilename, file;
-                for (indexFilename = 0; indexFilename < filenames.length; indexFilename++) {
-                    file = files[filenames[indexFilename]];
-                    length += 46 + file.nameBuf.length + file.comment.length;
-                }
-                const data = getDataHelper(length + 22);
-                for (indexFilename = 0; indexFilename < filenames.length; indexFilename++) {
-                    file = files[filenames[indexFilename]];
-                    data.view.setUint32(index, 0x504b0102);
-                    data.view.setUint16(index + 4, 0x1400);
-                    data.array.set(file.header.array, index + 6);
-                    data.view.setUint16(index + 32, file.comment.length, true);
-                    if (file.directory) {
-                        data.view.setUint8(index + 38, 0x10);
-                    }
-                    data.view.setUint32(index + 42, file.offset, true);
-                    data.array.set(file.nameBuf, index + 46);
-                    data.array.set(file.comment, index + 46 + file.nameBuf.length);
-                    index += 46 + file.nameBuf.length + file.comment.length;
-                }
-                data.view.setUint32(index, 0x504b0506);
-                data.view.setUint16(index + 8, filenames.length, true);
-                data.view.setUint16(index + 10, filenames.length, true);
-                data.view.setUint32(index + 12, length, true);
-                data.view.setUint32(index + 16, offset, true);
-                ctrl.enqueue(data.array);
-                ctrl.close();
-            }
-
-            function processNextChunk() {
-                if (!activeZipObject) return;
-                if (activeZipObject.directory) return activeZipObject.writeFooter(activeZipObject.writeHeader());
-                if (activeZipObject.reader) return pump(activeZipObject);
-                if (activeZipObject.fileLike.stream) {
-                    activeZipObject.crc = new Crc32();
-                    activeZipObject.reader = activeZipObject.fileLike.stream().getReader();
-                    activeZipObject.writeHeader();
-                } else next();
-            }
-            return new ReadableStream({
-                start: (c) => {
-                    ctrl = c;
-                    underlyingSource.start && Promise.resolve(underlyingSource.start(zipWriter));
-                },
-                pull() {
-                    return (
-                        processNextChunk() ||
-                        (underlyingSource.pull && Promise.resolve(underlyingSource.pull(zipWriter)))
-                    );
-                },
-            });
-        }
-
-        window.ZIP = createWriter;
     </script>
-    <script>
-        function extname(url) {
-            if (url.indexOf('data:') === 0) {
-                const mime = url.match(/data:([^;]+)/)[1];
-                return mime.split('/')[1];
-            }
-            return url.split('.').pop();
-        }
-        function basename(url) {
-            if (url.indexOf('data:') === 0) {
-                return '';
-            }
-            return url.split('/').pop();
-        }
-        function createWebpackRequire(modules, base = '') {
-            const installedModules = {};
-            function __webpack_require__(moduleId) {
-                if (installedModules[moduleId]) return installedModules[moduleId].exports;
-                var module = (installedModules[moduleId] = {
-                    exports: {},
-                    id: moduleId,
-                    loaded: false,
-                });
-                if (!modules[moduleId]) return '';
-                modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-                module.loaded = true;
-                return module.exports;
-            }
-            __webpack_require__.r = function (exports) {
-                if (typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-                    Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-                }
-                Object.defineProperty(exports, '__esModule', { value: true });
-            };
-            __webpack_require__.o = function (object, property) {
-                return Object.prototype.hasOwnProperty.call(object, property);
-            };
-            __webpack_require__.d = function (exports, name, getter) {
-                if (!getter) {
-                    const definition = name;
-                    for (var key in definition) {
-                        if (__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
-                            Object.defineProperty(exports, key, {
-                                enumerable: true,
-                                get: definition[key],
-                            });
-                        }
-                    }
-                    return;
-                }
-                if (!__webpack_require__.o(exports, name)) {
-                    Object.defineProperty(exports, name, { enumerable: true, get: getter });
-                }
-            };
+</head>
 
-            __webpack_require__.c = installedModules;
-            __webpack_require__.p = base;
-            return __webpack_require__;
-        }
-        function extractSpine(modules, url = '', w = window) {
-            const maybeFuncs = [];
-            Object.keys(modules).forEach((k) => {
-                const e = modules[k];
-                const et = e.toString();
-                if (et.includes('atlas:') && et.includes('json:')) maybeFuncs.push(k);
-            });
-            console.log('[extractSpine] Detected Top-Level Modules:', maybeFuncs);
-            console.log(modules);
-            const webpackRequire = createWebpackRequire(modules, url);
-            const insideModules = [];
-            w.Object._defineProperty = Object.defineProperty;
-            w.Object.defineProperty = (module, __esmodule, value) => {
-                if (__esmodule === '__esModule') {
-                    insideModules.push(module);
-                }
-                return w.Object._defineProperty(module, __esmodule, value);
-            };
-            const globalThis = window;
-            const maybeModules = maybeFuncs.map((e) => webpackRequire(e));
-            w.Object.defineProperty = Object._defineProperty;
-            const spines = [];
-            const mains = [];
-            console.log('Detected Sub-Level Modules:', insideModules);
-            const checkva = (va, name) => {
-                const vk = Array.isArray(va) ? 0 : Object.keys(va)[0];
-                const v = va[vk];
-                if (!v) return;
-                if (v.atlas && v.json) {
-                    spines.push(va);
-                    Object.values(va).forEach((v) => {
-                        v.module = name;
-                    });
-                    return;
-                }
-                if (v.id && v.src && v.type) {
-                    mains.push(va);
-                    va.forEach((v) => {
-                        v.module = name;
-                    });
-                }
-            };
-            insideModules.forEach((e) => {
-                const ek = Object.keys(e);
-                ek.forEach((k) => {
-                    if (k.includes && k.includes('_MANIFEST')) {
-                        const obj = e[k];
-                        const name = k.replace('_MANIFEST', '');
-                        console.log(name, obj);
-                        Object.values(obj).forEach((e) => checkva(e, name));
-                        checkva(obj, '');
-                    }
-                });
-            });
-            console.log(mains);
-            return {
-                SPINE_MANIFEST: spines.reduce((b, a) => Object.assign(a, b), {}),
-                MAIN_MANIFEST: mains.reduce((b, a) => a.concat(b), []),
-            };
-        }
-        function extractStaticFiles(modules, base) {
-            const matches = [];
-            Object.keys(modules).forEach((k) => {
-                const e = modules[k];
-                const et = e.toString();
-                const match = et.match(/[a-zA-Z0-9]\.exports\s?=\s?([a-zA-Z0-9]\.[a-zA-Z0-9]\s?\+)?\s?"(.*?)"/);
-                if (match) {
-                    const url = match[2];
-                    if (!url.startsWith('data:') && !match[1]) {
-                        return;
-                    }
-                    let bname = basename(url);
-                    if (bname) {
-                        const a = bname.split('.');
-                        a.pop(); // remove extension
-                        if (a.length >= 2) {
-                            // remove webpack hash
-                            a.pop();
-                        }
-                        bname = a.join('.');
-                    } else {
-                        bname = k.replace(/\//g, '_').replace(/\./g, '_').replace(/\:/g, '_').replace(/\+/g, '_');
-                    }
-                    matches.push({
-                        id: bname,
-                        src: url.includes('data:') ? url : new URL(url, base).toString(),
-                        _module: k,
-                    });
-                }
-            });
-            return matches;
-        }
-        async function fetchToZip(name, url) {
-            const res = await fetch(url);
-            const stream = () => res.body;
-            return {
-                name,
-                stream,
-            };
-        }
-        async function loadPageInIframe(url) {
-            // fetch url and load by srcdoc
-            const response = await fetch(url);
-            let html = await response.text();
-            if (html.includes('webpackJsonp')) {
-                html = html.replace(
-                    new RegExp(`<script type="text/javascript">`, 'g'),
-                    `<script type="text/dontexecute">`,
-                );
-            } else {
-                let entrName = '';
-                if (html.includes('Symbol.toStringTag') && html.includes('Object.defineProperty')) {
-                    // modified webpackjsonp name in html
-                    // parse to dom
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const script = doc.querySelectorAll('script');
-                    script.forEach((s) => {
-                        if (
-                            s.src.includes('sentry') ||
-                            s.textContent.includes('Sentry') ||
-                            s.textContent.includes('firebase')
-                        )
-                            s.type = 'text/dontexecute';
-                        if (
-                            s.textContent.includes('Symbol.toStringTag') &&
-                            s.textContent.includes('Object.defineProperty')
-                        ) {
-                            s.type = 'text/dontexecute';
-                            const matches = [...s.textContent.matchAll(/self\.(.*?)=self.(.*?)\|\|\[\]/g)];
-                            for (const match of matches) {
-                                if (match[1] == match[2]) {
-                                    if (entrName != '') {
-                                        alert(`Warning: Multiple entry points found: ${entrName} and ${match[1]}`);
-                                    }
-                                    entrName = match[1];
-                                }
-                            }
-                        }
-                    });
-                    html = doc.documentElement.outerHTML;
-                }
-                html = html.replace(
-                    `</head>`,
-                    `\<script\>
-window.webpackJsonp_ = [];
-window.cachedModules = [];
-window.loadedModules = [];
-window.webpackJsonpProxy = new Proxy(webpackJsonp_, {
-    get: (target, prop) => {
-        if (prop === 'push') {
-            return (...args) => {
-                console.log(args);
-                cachedModules.push(...args);
-            };
-        }
-        if (prop in target) {
-            return target[prop];
-        }
-        return undefined;
-    },
-    set: (target, prop, value) => {
-        if (prop === 'push') {
-            value(['inject',{
-                inject(module, exports, __webpack_require__){
-                    loadedModules = __webpack_require__.m
-                }
-            },[['inject']]])
-            console.log('set', prop, value);
-            return true;
-        }
-        target[prop] = value;
-        return true;
-    },
-});
-Object.defineProperty(window, '${entrName || 'webpackJsonp'}', {
-    value: webpackJsonpProxy,
-    writable: true,
-    enumerable: false,
-    configurable: false,
-});\</script\>`,
-                );
-            }
-            let base = url;
-            const matchVendors = html.match(/src="([^"]*?\/)vendors([^"]*?)js"/);
-            console.log(matchVendors);
-            if (matchVendors) {
-                base = matchVendors[1];
-            }
-            if(!base.includes('://')){
-                base = new URL(base, url).toString()
-            }
-            html = html.replace('<head>', `<head><base href="${base}">`);
-            const iframe = document.createElement('iframe');
-            iframe.srcdoc = html;
-            iframe.style.display = 'none';
-            document.body.appendChild(iframe);
-            return new Promise((resolve) => {
-                iframe.onload = () => {
-                    resolve({ iframe, base });
-                };
-            });
-        }
-        async function extract(url) {
-            btn.innerText = 'Fetching Page...';
-            const { iframe: frame, base } = await loadPageInIframe(url);
-            frame.contentWindow.regeneratorRuntime = regeneratorRuntime;
-            btn.innerText = 'Extracting Data...';
-            let modules = {};
-            if (frame.contentWindow.cachedModules) {
-                modules = {
-                    ...frame.contentWindow.loadedModules,
-                };
-                for (const i of frame.contentWindow.cachedModules) {
-                    modules = {
-                        ...modules,
-                        ...i[1],
-                    };
-                }
-            } else {
-                const webpackJsonp = frame.contentWindow.webpackJsonp;
-                console.log('found WebpackJsonp', webpackJsonp);
-                const vendors = webpackJsonp.find((e) => e[0].includes('vendors'));
-                if (!vendors) {
-                    btn.innerText = 'Load vendors.js faild!';
-                    return;
-                }
-                const Index = webpackJsonp.find((e) => e[0].includes('index'));
-                if (!Index) {
-                    btn.innerText = 'Load index.js faild!';
-                    return;
-                }
-                const Runtime = webpackJsonp.find((e) => e[0].includes('runtime'));
-                modules = { ...vendors[1], ...Index[1], ...(Runtime ? Runtime[1] : {}) };
-            }
-            const spineres = extractSpine(modules, new URL('.', base).toString(), frame.contentWindow);
-            console.log('Got Spine Data', spineres);
-            const staticres = extractStaticFiles(modules, new URL('.', base).toString());
-            console.log('Got Static Files', staticres);
-            btn.innerText = 'Preparing resources...';
-            const fn = (url.match(/event\/(.*?)\//) || ['', ''])[1].split('-')[0] || Date.now().toString();
-            const fileStream = streamSaver.createWriteStream(fn + '.zip');
-            const readableZipStream = new ZIP({
-                async start(ctrl) {
-                    btn.innerText = 'Download started...';
-                    const savedIds = [];
-                    // save spine json & atlas
-                    for (const i of Object.keys(spineres.SPINE_MANIFEST)) {
-                        const dir = spineres.SPINE_MANIFEST[i].module || '';
-                        const atlas = new File([spineres.SPINE_MANIFEST[i].atlas], dir + '/' + i + '.atlas', {
-                            type: 'text/plain',
-                        });
-                        ctrl.enqueue(atlas);
-                        const j = spineres.SPINE_MANIFEST[i].json;
-                        if (typeof j === 'string' && j.indexOf('http') === 0) {
-                            savedIds.push(j);
-                            ctrl.enqueue(await fetchToZip(dir + '/' + i + '.json', j));
-                        } else {
-                            const json = new File([JSON.stringify(j, null, 4)], dir + '/' + i + '.json', {
-                                type: 'application/json',
-                            });
-                            ctrl.enqueue(json);
-                        }
-                    }
-                    // save images
-                    const promises = Object.values(spineres.MAIN_MANIFEST).map((e) => {
-                        const dir = e.module || '';
-                        const fn = dir + '/' + e.id + '.' + extname(e.src);
-                        savedIds.push(e.src);
-                        return fetchToZip(fn, e.src).then((res) => ctrl.enqueue(res));
-                    });
-                    // save other static
-                    let otherlen = 0;
-                    const staticPromises = staticres.map((e) => {
-                        //skip things in savedIds
-                        if (savedIds.includes(e.src)) {
-                            return Promise.resolve();
-                        }
-                        const dir = '_other_resources';
-                        const fn = dir + '/' + e.id + '.' + extname(e.src);
-                        savedIds.push(e.src);
-                        otherlen++;
-                        return fetchToZip(fn, e.src).then((res) => ctrl.enqueue(res));
-                    });
-                    desc.innerText =
-                        `Extracted ${Object.keys(spineres.SPINE_MANIFEST).length} spine(s), ` +
-                        `${Object.keys(spineres.MAIN_MANIFEST).length} render-related image(s), ` +
-                        `${otherlen} other resource(s)`;
-                    await Promise.all(promises.concat(staticPromises));
-                    ctrl.close();
-                },
-            });
-            if (window.WritableStream && readableZipStream.pipeTo) {
-                await readableZipStream.pipeTo(fileStream);
-                btn.innerText = 'Done';
-            } else {
-                btn.innerText = 'FileWriter Unsupported!';
-            }
-        }
-        async function clk() {
-            btn.disabled = true;
-            try {
-                await extract(url.value);
-            } catch (e) {
-                console.error(e);
-                btn.innerText = 'Error!';
-            }
-            btn.disabled = false;
-        }
-        const href = location.href.replace(location.search, '').replace(location.hash, '');
-        if (href.endsWith('.html') && href.includes('event/')) {
-            url.value = href
-                .replace(location.origin, 'https://webstatic.mihoyo.com')
-                .replace('/webstatic-extractor/', '/');
-            clk();
-        }
-    </script>
+<body>
+    <div id="tt"><span>W</span>ebstatic <span>E</span>xtractor</div>
+    <div id="cc">
+        <input type="text" id="url" placeholder="https://webstatic.mihoyo.com/....." />
+        <button onclick="clk()" id="btn">Extract</button>
+        <div id="desc"></div>
+    </div>
+    <a href="https://github.com/YuehaiTeam/webstatic-extractor" class="github-corner"
+        aria-label="View source on GitHub"><svg width="80" height="80" viewBox="0 0 250 250"
+            style="fill: #fa932f; color: #fff; position: absolute; top: 0; border: 0; right: 0" aria-hidden="true">
+            <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+            <path
+                d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2"
+                fill="currentColor" style="transform-origin: 130px 106px" class="octo-arm"></path>
+            <path
+                d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z"
+                fill="currentColor" class="octo-body"></path>
+        </svg>
+    </a>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
+<script>
+    streamSaver.mitm = location.href.includes('/webstatic-extractor/' ? '/webstatic-extractor/mitm.html' : '/mitm.html')
+</script>
+<script src="vendor.js"></script>
+<script src="app.js"></script>
+
 </html>
