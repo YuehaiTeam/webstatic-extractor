@@ -117,7 +117,7 @@
 <script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
 <script>
-    streamSaver.mitm = location.href.includes('/webstatic-extractor/' ? '/webstatic-extractor/mitm.html' : '/mitm.html')
+    streamSaver.mitm = location.href.includes('/webstatic-extractor/') ? '/webstatic-extractor/mitm.html' : '/mitm.html'
 </script>
 <script src="vendor.js"></script>
 <script src="app.js"></script>
