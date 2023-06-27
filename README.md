@@ -1,8 +1,18 @@
-# WebstaticSpineExtractor  
+# Webstatic Extractor  
 Extract spine atlas &amp; json &amp; images from genshin web activity pages in one click!  
 一键从原神网页活动中提取spine模型及相关图片素材。使用streamsaver流式下载，用网页对付网页，魔法对抗魔法。
 
 如有部分素材无法提取，说明素材是从服务器动态获取的，不在资源包里。
+
+### 支持的域名：
+ - webstatic.mihoyo.com
+ - act.mihoyo.com
+
+### 不支持的域名：
+ - act.hoyoverse.com
+ - webstatic-sea.mihoyo.com
+
+对于Hoyoverse的海外网页活动，可以找到其在mihoyo.com域名下对应的页面之后使用。
 
 ### 其他参考：
 
