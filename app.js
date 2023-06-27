@@ -379,10 +379,3 @@ async function clk() {
     }
     btn.disabled = false;
 }
-const href = location.href.replace(location.search, '').replace(location.hash, '');
-if (href.endsWith('.html') && href.includes('event/')) {
-    url.value = href
-        .replace(location.origin, 'https://webstatic.mihoyo.com')
-        .replace('/webstatic-extractor/', '/');
-    clk();
-}
