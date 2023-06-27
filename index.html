@@ -118,6 +118,10 @@
 <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
 <script>
     streamSaver.mitm = location.href.includes('/webstatic-extractor/') ? '/webstatic-extractor/mitm.html' : '/mitm.html'
+</script>
+<script src="/vendor.js"></script>
+<script src="/app.js"></script>
+<script>
 
     const href = location.href.replace(location.search, '').replace(location.hash, '');
     const domain = location.pathname.split('/')[1]
@@ -132,7 +136,5 @@
         clk();
     }
 </script>
-<script src="/vendor.js"></script>
-<script src="/app.js"></script>
 
 </html>
