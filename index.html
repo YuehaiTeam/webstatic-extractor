@@ -584,7 +584,7 @@ Object.defineProperty(window, '${entrName || 'webpackJsonp'}', {
                 );
             }
             let base = url;
-            const matchVendors = html.match(/src="(.*?\/)vendors(.*?)js"/);
+            const matchVendors = html.match(/src="([^"]*?\/)vendors([^"]*?)js"/);
             console.log(matchVendors);
             if (matchVendors) {
                 base = matchVendors[1];
