@@ -118,6 +118,19 @@
 <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
 <script>
     streamSaver.mitm = location.href.includes('/webstatic-extractor/') ? '/webstatic-extractor/mitm.html' : '/mitm.html'
+
+    const href = location.href.replace(location.search, '').replace(location.hash, '');
+    const domain = location.pathname.split('/')[1]
+    if (href.endsWith('.html') && href.includes('event/') || domain.includes('.com')) {
+        if (!domain.includes('.com')) {
+            domain = 'webstatic.mihoyo.com'
+        }
+        url.value = href
+            .replace('/' + domain + '/', '/')
+            .replace(location.origin, 'https://' + domain)
+            .replace('/webstatic-extractor/', '/');
+        clk();
+    }
 </script>
 <script src="/vendor.js"></script>
 <script src="/app.js"></script>
