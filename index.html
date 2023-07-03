@@ -114,6 +114,11 @@
         </svg>
     </a>
 </body>
+<script>
+    if(location.protocol==='http:'){
+        location.replace(location.href.replace('http:','https:'))
+    }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.9/runtime.min.js"></script>
 <script>
@@ -122,7 +127,6 @@
 <script src="/vendor.js"></script>
 <script src="/app.js"></script>
 <script>
-
     const href = location.href.replace(location.search, '').replace(location.hash, '');
     const domain = location.pathname.split('/')[1]
     if (href.endsWith('.html') && href.includes('event/') || domain.includes('.com')) {
