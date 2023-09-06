@@ -110,6 +110,8 @@ function extractSpine(modules, url = '', w = window) {
                 const name = k.replace('_MANIFEST', '');
                 if (Array.isArray(obj)) {
                     checkva(obj, '_' + name);
+                } else if (Object.values(obj)[0].atlas) {
+                    checkva(obj, name);
                 } else {
                     Object.values(obj).forEach((e) => checkva(e, name));
                 }
