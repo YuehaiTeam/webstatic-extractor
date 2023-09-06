@@ -83,8 +83,11 @@ function extractSpine(modules, url = '', w = window) {
     const checkva = (va, name) => {
         console.log(va, name);
         const vk = Array.isArray(va) ? 0 : Object.keys(va)[0];
-        const v = va[vk];
+        let v = va[vk];
         if (!v) return;
+        if (typeof v !== 'object') {
+            v = va;
+        }
         if (v.atlas && v.json) {
             spines.push(va);
             Object.values(va).forEach((v) => {
@@ -116,10 +119,10 @@ function extractSpine(modules, url = '', w = window) {
     let mains_arr = mains.reduce((b, a) => a.concat(b), []);
     mains_arr = mains_arr.filter((e) => {
         if (mains_arr.find((p) => e.src === p.src) && e.module.startsWith('_')) {
-            return false
+            return false;
         }
-        return true
-    })
+        return true;
+    });
     return {
         SPINE_MANIFEST: spines.reduce((b, a) => Object.assign(a, b), {}),
         MAIN_MANIFEST: mains_arr,
@@ -170,10 +173,7 @@ async function loadPageInIframe(url) {
     const response = await fetch(url);
     let html = await response.text();
     if (html.includes('webpackJsonp')) {
-        html = html.replace(
-            new RegExp(`<script type="text/javascript">`, 'g'),
-            `<script type="text/dontexecute">`,
-        );
+        html = html.replace(new RegExp(`<script type="text/javascript">`, 'g'), `<script type="text/dontexecute">`);
     } else {
         let entrName = '';
         if (html.includes('Symbol.toStringTag') && html.includes('Object.defineProperty')) {
@@ -183,16 +183,9 @@ async function loadPageInIframe(url) {
             const doc = parser.parseFromString(html, 'text/html');
             const script = doc.querySelectorAll('script');
             script.forEach((s) => {
-                if (
-                    s.src.includes('sentry') ||
-                    s.textContent.includes('Sentry') ||
-                    s.textContent.includes('firebase')
-                )
+                if (s.src.includes('sentry') || s.textContent.includes('Sentry') || s.textContent.includes('firebase'))
                     s.type = 'text/dontexecute';
-                if (
-                    s.textContent.includes('Symbol.toStringTag') &&
-                    s.textContent.includes('Object.defineProperty')
-                ) {
+                if (s.textContent.includes('Symbol.toStringTag') && s.textContent.includes('Object.defineProperty')) {
                     s.type = 'text/dontexecute';
                     const matches = [...s.textContent.matchAll(/self\.(.*?)=self.(.*?)\|\|\[\]/g)];
                     for (const match of matches) {
@@ -255,7 +248,7 @@ configurable: false,
         base = matchVendors[1];
     }
     if (!base.includes('://')) {
-        base = new URL(base, url).toString()
+        base = new URL(base, url).toString();
     }
     html = html.replace('<head>', `<head><base href="${base}">`);
     const iframe = document.createElement('iframe');
