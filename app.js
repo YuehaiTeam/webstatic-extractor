@@ -370,6 +370,10 @@ async function extract(url) {
             }
             // save images
             const promises = Object.values(spineres.MAIN_MANIFEST).map((e) => {
+                //skip things in savedIds
+                if (savedIds.includes(e.src)) {
+                    return Promise.resolve();
+                }
                 const dir = e.module || '';
                 const fn = dir + '/' + e.id + '.' + extname(e.src);
                 savedIds.push(e.src);
