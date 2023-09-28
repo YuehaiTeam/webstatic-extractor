@@ -82,7 +82,7 @@ function createWriter(underlyingSource) {
             const date = new Date(typeof fileLike.lastModified === 'undefined' ? Date.now() : fileLike.lastModified)
 
             if (fileLike.directory && !name.endsWith('/')) name += '/'
-            if (files[name]) throw new Error('File already exists.')
+            if (files[name]) console.warn('File already exists.', fileLike)
             filesSize += fileLike.size
             zip64 = (filesSize >= 0xffffffff)
 
